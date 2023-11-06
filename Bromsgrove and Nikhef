@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar 17 14:45:49 2022
+
+@author: jaishivbhalla
+"""
+
+from pylab import *
+import tables
+import datetime
+import sapphire
+from sapphire import esd
+import sapphire.time_util
+import pandas as pd
+#comparing muon flux for countries in different regions on the same date
+
+data = esd.quick_download(14006)
+data2 = esd.quick_download(501)
+print(data)
+print(data2)
+start_1 = datetime.datetime(2018, 6, 2, 9)
+end_1 = datetime.datetime(2018, 6, 2, 22)
+start_2 = datetime.datetime(2018, 7, 2, 5)
+end_2 = datetime.datetime(2018, 7, 2, 20)
+
+esd.download_data(data, '/s14006', 14006, start_1, end_1) # needs a file in
+
+esd.download_data(data2, '/s501', 501, start_2, end_2) # needs a file in 
+
+events = data.root.s14006.events
+
+events2 = data2.root.s501.events
+
+t0 = 1527930000
+t1 = t0 + 13*3600
+
+t2 = 1530507601
+t3 = t2 + 15*3600
+
+sel_events_1 = events.read_where(f'({t0} <= timestamp) & (timestamp < {t1})')
+sel_events_2 = events2.read_where(f'({t2} <= timestamp) & (timestamp < {t3})')
+
+#plotting histogram
+ph1 = sel_events_1['pulseheights']
+ph2 = sel_events_2['pulseheights']
+bins = linspace(1000, 2000, 101)
+n, bins, patches = hist(ph1[0:, 0], bins, histtype='step', log= False)
+n2, bins2, patches2 = hist(ph2[0:, 0], bins, histtype='step', log= False)
+xlabel("Pulseheight [ADC]")
+ylabel("Counts")
+title("Pulseheight histogram of Nikhef and South Bromsgrove")
+print(n) #prints the count value of each bin to be used in array of standard deviation loop
+print(n2)
+
+a = np.linspace(1000, 2000, 101)
+
+if len(n)!=len(n2):
+    raise Exception("Bins don't match")
+
+
+for i in range(len(n)):
+    if n[i] == 0 and n2[i] == 0:
+        sigma = 0
+    else:
+        sigma = np.abs((n[i] - n2[i]))/np.sqrt(n[i] + n2[i])
+    print(sigma)
+    a[i] = sigma
+
+fig, axs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3,2]})
+axs[0].hist(ph1[0:, 0], bins, histtype='step', log=False, label='Bromsgrove')
+axs[0].hist(ph2[0:, 0], bins, histtype='step', log=False, label='Nikhef')
+fig.suptitle('Pulseheight histogram of Nikhef and South Bromsgrove')
+axs[0].set_xlabel('Pulseheight [ADC]')
+axs[0].set_ylabel('Counts')
+axs[0].grid(True)
+leg = axs[0].legend()
+
+pxy = axs[1].scatter(bins, a, alpha=0.5, color = 'k')
+plt.axhline(y=3, color='r', linestyle='-')
+axs[1].set_ylabel('pull σ')
+axs[1].set_ylim([0,4])
+fig.tight_layout()
+plt.show()
